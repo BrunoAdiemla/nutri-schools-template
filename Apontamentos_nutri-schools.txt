@@ -1,0 +1,116 @@
+-----------------------------------
+APONTAMENTOS SOBRE O NUTRI SCHOOLS
+-----------------------------------
+
+- Ideia geral: App para gestão de recursos alimentares para escolas
+- Público-alvo: nutricionistas escolares; gestores escolares
+- Funcionalidades:
+
+ - cadastro de ingredientes:
+  - nome
+  - Unidade de medida
+  - Quantidade de Caloria por unidade de medida
+
+ - Cadastro de preparações
+  - Nome
+  - valor per capita
+  - Ingredientes (quantidade para a quantidade per capita)
+  - Modo de preparo
+
+ - Cadastro de cardápio (conjunto de dias)
+  - Por dia (conjunto de refeições)
+   - Cada refeição do dia
+    - Especifica a preparação
+    - Especifica a quantidade de comensais 
+ 
+
+
+----------------------
+Tabelas do Banco de dados
+--------------------------
+
+- user
+ - nome
+ - email
+ - cidade
+ - estado
+ - rua 
+ - bairro
+ - CEP
+ - função
+ - nome escola
+ - 
+
+
+- Ingrediente
+ - nome | (texto)
+ - Unidade de medida | (texto)
+ - Caloria por unidade de medida | (float)
+ - default | (boleano)
+ - created_by | uuid
+
+- Preparacao
+ - nome | (texto)
+ - valor per capita | (float)
+ - Modo de preparo | (texto)
+ - tipo (sólido, líquido, frutas, acompanhamento, guarnição, complemento, guarnição, entrada, sobremesa) | (texto
+ - refeicoes_presente [checkbox] (colação, almoço, lanche, jantar) | (array de textos)
+ - default | (boleano)
+ - created_by | uuid
+
+- ingrediente_preparacao
+ - ingrediente_id | uuid
+ - preparacao_id | uuid
+ - quantidade_para_percapita | (float)
+ - unidade_de_medida | (texto)
+
+
+- Refeição
+ - tipo (colação, almoço, lanche, jantar)
+ - comensais adultos (int)
+ - comensais pequenos (int)
+ - comensais adolescentes (int)
+ - cardapio_id
+ - created_by | uuid
+
+- refeicao_preparacoes
+ - nome (texto)
+ - preparacao_id
+ - refeicao_id
+
+- Cardapio_do_dia
+ - data
+ - created_by | uuid
+
+- Lista de compras
+ - lista de Cardapio_do_dia
+ - Data inicial
+ - Data final
+ - created_by | uuid
+
+- ingredientes_estoque
+ - ingrediente_id
+ - quantidade atual
+ - data_atualizacao
+
+---------------------------
+Telas
+--------------------
+- Menu sidebar (colapsável)
+ - Logo
+ - Home
+ - Listas de compras 
+ - Cardápios
+ - Preparações
+ - Ingredientes
+
+- Header
+ - Avatar + email
+ - mini menu
+
+
+
+
+
+
+

@@ -1,0 +1,504 @@
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { AuthService, SignUpData, SignInData } from '../services/AuthService';
+import { UserProfile } from '../services/DatabaseService';
+import type { User, Session } from '@supabase/supabase-js';
+
+interface AuthState {
+  session: Session | null;
+  user: User | null;
+  profile: UserProfile | null;
+  loading: boolean;
+  error: string | null;
+}
+
+interface AuthContextType extends AuthState {
+  signUp: (data: SignUpData) => Promise<{ success: boolean; error?: string }>;
+  signIn: (data: SignInData) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  refreshProfile: () => Promise<void>;
+  isAuthenticated: boolean;
+  needsProfileSetup: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+// Profile cache interface
+interface ProfileCache {
+  userId: string;
+  profile: UserProfile | null; // Allow null profiles to be cached
+  timestamp: number;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [state, setState] = useState<AuthState>({
+    session: null,
+    user: null,
+    profile: null,
+    loading: true,
+    error: null
+  });
+
+  // Cache and refs for optimization
+  const profileCacheRef = useRef<ProfileCache | null>(null);
+  const lastUserIdRef = useRef<string | null>(null);
+  const CACHE_DURATION = 20 * 60 * 1000; // 20 minutes
+
+  // Check if profile cache is valid
+  const isProfileCacheValid = (userId: string): boolean => {
+    const cache = profileCacheRef.current;
+    if (!cache || cache.userId !== userId) return false;
+    
+    const now = Date.now();
+    const isValid = (now - cache.timestamp) < CACHE_DURATION;
+    
+    if (!isValid) {
+      console.log('Profile cache expired, will refresh');
+    }
+    
+    return isValid;
+  };
+
+  // Initialize auth state - seguindo padrão do ChatGPT
+  useEffect(() => {
+    console.log('Initializing auth...');
+    
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('Initial session:', !!session);
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        setState({
+          session: null,
+          user: null,
+          profile: null,
+          loading: false,
+          error: error.message
+        });
+        return;
+      }
+
+      if (session?.user) {
+        // Check if user email is confirmed before loading profile
+        if (!session.user.email_confirmed_at) {
+          console.log('Initial session found but email not confirmed');
+          setState({
+            session: null, // Keep session null so user stays in public routes
+            user: null,
+            profile: null,
+            loading: false,
+            error: null
+          });
+          return;
+        }
+        
+        // User is authenticated and confirmed, load profile
+        loadUserProfile(session.user, session);
+      } else {
+        // No session
+        setState({
+          session: null,
+          user: null,
+          profile: null,
+          loading: false,
+          error: null
+        });
+      }
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Check if user email is confirmed
+        if (!session.user.email_confirmed_at) {
+          console.log('User signed in but email not confirmed, staying in public area');
+          // User registered but hasn't confirmed email yet - don't load profile
+          setState({
+            session: null, // Keep session null so user stays in public routes
+            user: null,
+            profile: null,
+            loading: false,
+            error: null
+          });
+          return;
+        }
+        
+        // Check if this is the same user to avoid unnecessary reloads
+        if (lastUserIdRef.current === session.user.id && isProfileCacheValid(session.user.id)) {
+          console.log('Same user with valid cache, skipping profile reload');
+          // Just update session without loading
+          setState(prev => ({
+            ...prev,
+            session,
+            user: session.user,
+            loading: false
+          }));
+          return;
+        }
+        
+        // New user or cache expired, load profile
+        await loadUserProfile(session.user, session);
+      } else if (event === 'SIGNED_OUT') {
+        // User signed out - clear everything
+        console.log('User signed out, clearing cache');
+        profileCacheRef.current = null;
+        lastUserIdRef.current = null;
+        setState({
+          session: null,
+          user: null,
+          profile: null,
+          loading: false,
+          error: null
+        });
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Token refreshed - update session silently without loading
+        setState(prev => ({
+          ...prev,
+          session,
+          user: session.user
+        }));
+      }
+      // Ignore other events like INITIAL_SESSION
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Load user profile from public.users table with intelligent caching
+  const loadUserProfile = async (user: User, session: Session) => {
+    try {
+      console.log('Loading profile for user:', user.id);
+      
+      // Check cache first
+      if (isProfileCacheValid(user.id)) {
+        console.log('Using cached profile');
+        const cachedProfile = profileCacheRef.current!.profile;
+        setState({
+          session,
+          user,
+          profile: cachedProfile, // This can now be null
+          loading: false,
+          error: null
+        });
+        lastUserIdRef.current = user.id;
+        return;
+      }
+
+      // Cache miss or expired - show loading and fetch from database
+      console.log('Cache miss, fetching from database');
+      setState(prev => ({
+        ...prev,
+        session,
+        user,
+        loading: true,
+        error: null
+      }));
+
+      console.log('🔍 AuthContext.loadUserProfile - Calling AuthService.getUserProfile...');
+      const { profile, error } = await AuthService.getUserProfile(user.id);
+      console.log('🔍 AuthContext.loadUserProfile - AuthService returned:', {
+        hasProfile: !!profile,
+        hasError: !!error,
+        errorMessage: error
+      });
+      
+      if (error) {
+        console.error('Error loading profile:', error);
+        // Profile doesn't exist - user needs to complete setup
+        // Cache the null result to avoid repeated database calls
+        profileCacheRef.current = {
+          userId: user.id,
+          profile: null,
+          timestamp: Date.now()
+        };
+        
+        setState({
+          session,
+          user,
+          profile: null,
+          loading: false,
+          error: null
+        });
+        lastUserIdRef.current = user.id;
+        return;
+      }
+
+      // Success - cache the profile and update state
+      console.log('Profile loaded successfully');
+      profileCacheRef.current = {
+        userId: user.id,
+        profile,
+        timestamp: Date.now()
+      };
+      
+      setState({
+        session,
+        user,
+        profile,
+        loading: false,
+        error: null
+      });
+      lastUserIdRef.current = user.id;
+    } catch (error) {
+      console.error('Error in loadUserProfile:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to load user profile'
+      }));
+    }
+  };
+
+  // Auth actions
+  const signUp = async (data: SignUpData): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+
+      const result = await AuthService.signUp(data);
+      
+      if (result.error) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: result.error?.message || 'Sign up failed'
+        }));
+        return { success: false, error: result.error.message };
+      }
+
+      // Set loading to false immediately after successful signup
+      // The user will see the success message in RegisterPage
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: null
+      }));
+      
+      return { success: true };
+    } catch (error) {
+      const errorMessage = 'Sign up failed';
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage
+      }));
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const signIn = async (data: SignInData): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+
+      const result = await AuthService.signIn(data);
+      
+      if (result.error) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: result.error?.message || 'Sign in failed'
+        }));
+        return { success: false, error: result.error.message };
+      }
+
+      // Don't set loading to false here - let onAuthStateChange handle it
+      return { success: true };
+    } catch (error) {
+      const errorMessage = 'Sign in failed';
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage
+      }));
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const signOut = async (): Promise<void> => {
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+
+      const { error } = await AuthService.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: error.message
+        }));
+        return;
+      }
+
+      // Don't set state here - let onAuthStateChange handle it
+    } catch (error) {
+      console.error('Sign out error:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Sign out failed'
+      }));
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await AuthService.resetPassword(email);
+      
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Password reset failed' };
+    }
+  };
+
+  const updatePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await AuthService.updatePassword(newPassword);
+      
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Password update failed' };
+    }
+  };
+
+  const refreshProfile = async (): Promise<void> => {
+    if (!state.user) return;
+
+    try {
+      console.log('Manually refreshing profile, clearing cache...');
+      
+      // Clear cache to force fresh fetch
+      profileCacheRef.current = null;
+      
+      const { profile, error } = await AuthService.getUserProfile(state.user.id);
+      
+      if (error) {
+        console.error('Failed to refresh profile:', error);
+        // Cache the null result even on error
+        profileCacheRef.current = {
+          userId: state.user.id,
+          profile: null,
+          timestamp: Date.now()
+        };
+        setState(prev => ({ ...prev, profile: null, error }));
+        return;
+      }
+
+      // Update cache with fresh data (profile can be null)
+      profileCacheRef.current = {
+        userId: state.user.id,
+        profile,
+        timestamp: Date.now()
+      };
+
+      setState(prev => ({ ...prev, profile, error: null }));
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+      setState(prev => ({ ...prev, error: 'Failed to refresh profile' }));
+    }
+  };
+
+  const contextValue: AuthContextType = {
+    ...state,
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    updatePassword,
+    refreshProfile,
+    isAuthenticated: !!state.session && !!state.user,
+    needsProfileSetup: !!state.session && !!state.user && !state.profile
+  };
+
+  // Debug logging - logs essenciais apenas
+  console.log('AuthContext state:', {
+    session: !!state.session,
+    user: !!state.user,
+    profile: !!state.profile,
+    loading: state.loading,
+    isAuthenticated: !!state.session && !!state.user,
+    needsProfileSetup: !!state.session && !!state.user && !state.profile
+  });
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook to use auth context
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  
+  return context;
+};
+
+// HOC for protected routes
+export const withAuth = <P extends object>(
+  Component: React.ComponentType<P>
+): React.FC<P> => {
+  return (props: P) => {
+    const { isAuthenticated, loading } = useAuth();
+
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+
+    if (!isAuthenticated) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Authentication Required
+            </h2>
+            <p className="text-gray-600">
+              Please sign in to access this page.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return <Component {...props} />;
+  };
+};
+
+// Hook for authentication guards
+export const useAuthGuard = () => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  return {
+    isAuthenticated,
+    loading,
+    user,
+    canAccess: isAuthenticated && !loading,
+    requiresAuth: !isAuthenticated && !loading
+  };
+};
