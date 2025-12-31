@@ -66,7 +66,7 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-20">
       <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
         <div className="h-4 w-[1px] bg-slate-200"></div>
@@ -104,10 +104,10 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
           {isDropdownOpen && (
             <>
               {/* Backdrop */}
-              <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)}></div>
+              <div className="fixed inset-0 z-30" onClick={() => setIsDropdownOpen(false)}></div>
               
               {/* Menu */}
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-50">
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-40">
                 {/* User Info */}
                 <div className="px-4 py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">

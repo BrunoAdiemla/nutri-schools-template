@@ -12,7 +12,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isCollapsed,
   return (
     <aside 
       key={isCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}
-      className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 h-screen sticky top-0 flex flex-col transition-all duration-300 ease-in-out z-30 shadow-sm`}
+      className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 h-screen sticky top-0 flex flex-col transition-all duration-300 ease-in-out z-40 shadow-sm`}
     >
       <div className="p-6 border-b border-slate-100 flex items-center justify-between relative h-16 shrink-0">
         <div className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>
@@ -35,7 +35,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isCollapsed,
             e.preventDefault();
             onToggleCollapse();
           }}
-          className="absolute -right-3 top-8 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all z-40 focus:outline-none"
+          className="absolute -right-3 top-8 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-md transition-all z-50 focus:outline-none"
+          style={{ zIndex: 50 }}
           aria-label={isCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
         >
           <i data-lucide={isCollapsed ? "chevron-right" : "chevron-left"} className="w-3 h-3"></i>
