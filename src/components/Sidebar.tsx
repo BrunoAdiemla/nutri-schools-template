@@ -1,5 +1,6 @@
 import React from 'react';
 import { NAV_ITEMS } from '../constants';
+import { useLucideIcons } from '../hooks/useLucideIcons';
 
 interface SidebarProps {
   activeItem: string;
@@ -9,6 +10,9 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isCollapsed, onToggleCollapse }) => {
+  // Initialize Lucide icons using custom hook
+  useLucideIcons([isCollapsed, activeItem]);
+
   return (
     <aside 
       key={isCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}

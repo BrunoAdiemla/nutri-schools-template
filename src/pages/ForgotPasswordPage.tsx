@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
 
 const ForgotPasswordPage: React.FC = () => {
   const { resetPassword, loading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
 
   // Initialize Lucide icons
   useEffect(() => {
@@ -25,30 +26,29 @@ const ForgotPasswordPage: React.FC = () => {
     e.preventDefault();
     
     if (!email.trim()) {
-      setError('Email é obrigatório');
+      showError('Email é obrigatório');
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Email deve ter um formato válido');
+      showError('Email deve ter um formato válido');
       return;
     }
 
     setIsSubmitting(true);
-    setError('');
-    setMessage('');
 
     try {
       const result = await resetPassword(email.trim());
       
       if (!result.success) {
-        setError(result.error || 'Erro ao enviar email de recuperação');
+        showError('Erro ao enviar email', result.error || 'Tente novamente.');
       } else {
-        setMessage('Email de recuperação enviado! Verifique sua caixa de entrada.');
+        setEmailSent(true);
+        showSuccess('Email enviado!', 'Verifique sua caixa de entrada para as instruções de recuperação.');
       }
     } catch (error) {
       console.error('Password reset error:', error);
-      setError('Erro inesperado. Tente novamente.');
+      showError('Erro inesperado', 'Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -89,26 +89,6 @@ const ForgotPasswordPage: React.FC = () => {
         {/* Recovery Form */}
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Success Message */}
-            {message && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                <div className="flex items-center gap-2">
-                  <i data-lucide="check-circle" className="w-4 h-4 text-green-600"></i>
-                  <span className="text-sm text-green-700">{message}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center gap-2">
-                  <i data-lucide="alert-circle" className="w-4 h-4 text-red-600"></i>
-                  <span className="text-sm text-red-700">{error}</span>
-                </div>
-              </div>
-            )}
-
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
@@ -119,10 +99,7 @@ const ForgotPasswordPage: React.FC = () => {
                   type="email"
                   id="email"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (error) setError('');
-                  }}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none focus:ring-1"
                   placeholder="seu@email.com"
                   disabled={isSubmitting}
@@ -136,7 +113,7 @@ const ForgotPasswordPage: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !!message}
+              disabled={isSubmitting || emailSent}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 px-4 rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
@@ -144,7 +121,7 @@ const ForgotPasswordPage: React.FC = () => {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   <span>Enviando...</span>
                 </div>
-              ) : message ? (
+              ) : emailSent ? (
                 'Email enviado'
               ) : (
                 'Enviar instruções'

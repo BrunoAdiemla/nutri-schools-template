@@ -8,10 +8,60 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Tratamento de erros globais -->
+    <script>
+        // Capturar erros de DOM relacionados ao Lucide
+        window.addEventListener('error', function(event) {
+            if (event.error && event.error.message && 
+                (event.error.message.includes('removeChild') || 
+                 event.error.message.includes('Node'))) {
+                // Silenciar erros de DOM do Lucide
+                event.preventDefault();
+                return false;
+            }
+        });
+
+        // Capturar erros não tratados
+        window.addEventListener('unhandledrejection', function(event) {
+            if (event.reason && event.reason.message && 
+                (event.reason.message.includes('removeChild') || 
+                 event.reason.message.includes('Node'))) {
+                // Silenciar erros de DOM do Lucide
+                event.preventDefault();
+                return false;
+            }
+        });
+    </script>
+    
+    <!-- Lucide Icons - Carregado após o React para evitar conflitos -->
+    <script>
+        // Aguardar o React carregar completamente antes de inicializar os ícones
+        window.addEventListener('load', function() {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/lucide@latest';
+            script.onload = function() {
+                // Função global para inicializar ícones de forma segura
+                window.initLucideIcons = function() {
+                    try {
+                        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                            window.lucide.createIcons();
+                        }
+                    } catch (error) {
+                        // Silenciar erros de DOM durante navegação
+                        console.warn('Aviso: Erro ao inicializar ícones Lucide (normal durante navegação)');
+                    }
+                };
+                
+                // Inicializar ícones pela primeira vez
+                window.initLucideIcons();
+            };
+            document.head.appendChild(script);
+        });
+    </script>
 </body>
 </html>

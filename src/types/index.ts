@@ -8,7 +8,7 @@ export enum MenuStatus {
 
 export type PreparacaoTipo = 'sólido' | 'líquido' | 'frutas' | 'acompanhamento' | 'guarnição' | 'entrada' | 'sobremesa' | 'complemento';
 export type RefeicaoTipo = 'colação' | 'almoço' | 'lanche' | 'jantar';
-export type UserFuncao = 'nutricionista' | 'gestor';
+export type UserFuncao = 'nutricionista' | 'gestor' | 'outro';
 
 // Legacy types (will be replaced with Supabase types)
 export interface MenuItem {

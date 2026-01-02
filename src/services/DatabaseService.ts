@@ -13,6 +13,7 @@ export interface UserProfile {
   cep?: string;
   funcao?: string;
   nome_escola: string;
+  avatar_url?: string;
   created_at: string;
 }
 

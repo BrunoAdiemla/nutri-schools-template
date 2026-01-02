@@ -1,26 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLucideIcons } from '../hooks/useLucideIcons';
 
 interface HeaderProps {
   title: string;
+  onNavigate?: (page: string) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ title }) => {
+const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
   const { user, profile, signOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Lucide icons
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // @ts-ignore
-      if (window.lucide) {
-        // @ts-ignore
-        window.lucide.createIcons();
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [isDropdownOpen]);
+  // Initialize Lucide icons using custom hook
+  useLucideIcons([isDropdownOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -133,7 +126,10 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
                 {/* Menu Items */}
                 <div className="py-1">
                   <button
-                    onClick={() => setIsDropdownOpen(false)}
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onNavigate?.('profile');
+                    }}
                     className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
                   >
                     <i data-lucide="user" className="w-4 h-4 text-slate-400"></i>
@@ -141,7 +137,10 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
                   </button>
                   
                   <button
-                    onClick={() => setIsDropdownOpen(false)}
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onNavigate?.('settings');
+                    }}
                     className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
                   >
                     <i data-lucide="settings" className="w-4 h-4 text-slate-400"></i>
